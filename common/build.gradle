@@ -1,0 +1,22 @@
+plugins {
+   id 'java'
+   id 'com.github.johnrengelman.shadow' version '7.1.2'
+}
+
+dependencies {
+   // common lib deps
+   implementation 'com.eclipsesource.minimal-json:minimal-json:0.9.5'
+   
+   // Add graal dependencies
+   implementation "com.caoccao.javet:javet:${javetVersion}"
+}
+
+jar {
+   archiveBaseName.set('grakkit')
+   archiveClassifier.set('common')
+   archiveVersion.set(project.property('version'))
+}
+
+repositories {
+   mavenCentral()
+}
