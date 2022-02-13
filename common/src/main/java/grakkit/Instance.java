@@ -1,13 +1,16 @@
 package grakkit;
 
+import com.caoccao.javet.enums.JSRuntimeType;
+
 import com.caoccao.javet.exceptions.JavetException;
 
-import com.caoccao.javet.interop.V8Runtime;
+import com.caoccao.javet.interop.NodeRuntime;
 
 import com.caoccao.javet.interop.converters.JavetProxyConverter;
 
 import com.caoccao.javet.interop.engine.IJavetEngine;
 import com.caoccao.javet.interop.engine.IJavetEnginePool;
+import com.caoccao.javet.interop.engine.JavetEngineConfig;
 import com.caoccao.javet.interop.engine.JavetEnginePool;
 
 import java.io.IOException;
@@ -18,10 +21,15 @@ import java.util.LinkedList;
 public class Instance {
 
    /** The underlying context associated with this instance. */
-   public V8Runtime context;
+   public NodeRuntime context;
 
    /** The engine used for all instance contexts. */
-   public static IJavetEnginePool<V8Runtime> pool = new JavetEnginePool<>();
+   public static IJavetEnginePool<NodeRuntime> pool = new JavetEnginePool<>(
+      new JavetEngineConfig()
+         .setAllowEval(true)
+         .setGlobalName("globalThis")
+         .setJSRuntimeType(JSRuntimeType.Node)
+   );
 
    /** All registered unload hooks tied to this instance. */
    public final Queue hooks = new Queue();
@@ -35,7 +43,8 @@ public class Instance {
    /** The root directory of this instance. */
    public String root;
 
-   public IJavetEngine<V8Runtime> engine;
+   /** The engine of this instance. */
+   public IJavetEngine<NodeRuntime> engine;
 
    /** All queued tasks linked to this instance. */
    public final Queue tasks = new Queue();
@@ -49,15 +58,20 @@ public class Instance {
 
    /** Closes this instance's context. */
    public void close () {
-      V8Runtime context = this.context;
+      NodeRuntime context = this.context;
       this.hooks.release();
-      context.terminateExecution();
+      try {
+         context.close();
+      } catch (Throwable error) {
+         context.terminateExecution();
+      }
    }
 
    /** Closes this instance and removes it from the instance registry. */
-   public void destroy () {
+   public void destroy () throws JavetException {
       this.close();
       Grakkit.instances.remove(this);
+      engine.close();
    }
 
    /** Executes this instance by calling its entry point. */

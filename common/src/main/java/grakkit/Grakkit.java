@@ -1,7 +1,11 @@
 package grakkit;
 
 import com.caoccao.javet.enums.JSRuntimeType;
+
+import com.caoccao.javet.exceptions.JavetException;
+
 import com.caoccao.javet.interop.V8Host;
+
 import com.caoccao.javet.values.reference.V8ValueFunction;
 
 import com.eclipsesource.json.Json;
@@ -33,10 +37,16 @@ public class Grakkit {
    public static final HashMap<String, URLClassLoader> loaders = new HashMap<>();
 
    /** Closes all open instances. */
-   public static void close () {
+   public static void close () throws JavetException {
       V8Host.getInstance(JSRuntimeType.Node).unloadLibrary();
       Grakkit.driver.close();
-      new ArrayList<>(Grakkit.instances).forEach(value -> value.destroy());
+      new ArrayList<>(Grakkit.instances).forEach(value -> {
+         try {
+            value.destroy();
+         } catch (Throwable error) {
+            // do nothing...?
+         }
+      });
    }
 
    /** Initializes the Grakkit Environment. */
@@ -71,7 +81,7 @@ public class Grakkit {
       try {
          URL resource = clazz.getProtectionDomain().getCodeSource().getLocation();
          if (resource instanceof URL) return resource;
-      } catch (SecurityException | NullPointerException error) {
+      } catch (Throwable error) {
          // do nothing
       }
       URL resource = clazz.getResource(clazz.getSimpleName() + ".class");
@@ -107,7 +117,7 @@ public class Grakkit {
       }
    }
 
-   /** Javet pre-init. */
+   /** Javet setup. */
    static {
       V8Host.setLibraryReloadable(true);
    }

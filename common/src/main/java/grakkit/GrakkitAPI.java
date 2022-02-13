@@ -121,7 +121,13 @@ public class GrakkitAPI {
    /** Closes all open instances, resets everything, and swaps the main instance. */
    public void reload () throws Exception {
       if (this.instance == Grakkit.driver) {
-         new ArrayList<>(Grakkit.instances).forEach(value -> value.destroy());
+         new ArrayList<>(Grakkit.instances).forEach(value -> {
+            try {
+               value.destroy();
+            } catch (Throwable error) {
+               // do nothing
+            }
+         });
          Grakkit.channels.clear();
          Grakkit.loaders.clear();
          this.swap();
