@@ -2,9 +2,10 @@ package grakkit;
 
 import com.caoccao.javet.enums.JSRuntimeType;
 
-import com.caoccao.javet.exceptions.JavetException;
-
 import com.caoccao.javet.interop.V8Host;
+
+import com.caoccao.javet.interop.engine.JavetEngineConfig;
+import com.caoccao.javet.interop.engine.JavetEnginePool;
 
 import com.caoccao.javet.values.reference.V8ValueFunction;
 
@@ -37,9 +38,13 @@ public class Grakkit {
    public static final HashMap<String, URLClassLoader> loaders = new HashMap<>();
 
    /** Closes all open instances. */
-   public static void close () throws JavetException {
-      V8Host.getInstance(JSRuntimeType.Node).unloadLibrary();
+   public static void close () {
       Grakkit.driver.close();
+      try {
+         Grakkit.driver.engine.close();
+      } catch (Throwable error) {
+         // do nothing
+      }
       new ArrayList<>(Grakkit.instances).forEach(value -> {
          try {
             value.destroy();
@@ -47,6 +52,16 @@ public class Grakkit {
             // do nothing...?
          }
       });
+      V8Host runtime = V8Host.getInstance(JSRuntimeType.Node);
+      runtime.setLibraryReloadable(true);
+      try {
+         Instance.pool.close();
+         Instance.pool = null;
+         runtime.close();
+      } catch (Throwable error) {
+         // do nothing
+      }
+      runtime.unloadLibrary();
    }
 
    /** Initializes the Grakkit Environment. */
@@ -68,6 +83,13 @@ public class Grakkit {
             error.printStackTrace();
          }
       }
+      V8Host.setLibraryReloadable(true);
+      Instance.pool = new JavetEnginePool<>(
+         new JavetEngineConfig()
+            .setAllowEval(true)
+            .setGlobalName("globalThis")
+            .setJSRuntimeType(JSRuntimeType.Node)
+      );
       try {
          Grakkit.driver = new FileInstance(root, main, "grakkit");
          Grakkit.driver.open();
@@ -115,10 +137,5 @@ public class Grakkit {
       } catch (Throwable error) {
          throw new RuntimeException("Failed to load classes!", error);
       }
-   }
-
-   /** Javet setup. */
-   static {
-      V8Host.setLibraryReloadable(true);
    }
 }

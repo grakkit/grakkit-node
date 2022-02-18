@@ -1,7 +1,5 @@
 package grakkit;
 
-import com.caoccao.javet.enums.JSRuntimeType;
-
 import com.caoccao.javet.exceptions.JavetException;
 
 import com.caoccao.javet.interop.NodeRuntime;
@@ -10,8 +8,6 @@ import com.caoccao.javet.interop.converters.JavetProxyConverter;
 
 import com.caoccao.javet.interop.engine.IJavetEngine;
 import com.caoccao.javet.interop.engine.IJavetEnginePool;
-import com.caoccao.javet.interop.engine.JavetEngineConfig;
-import com.caoccao.javet.interop.engine.JavetEnginePool;
 
 import java.io.IOException;
 
@@ -24,12 +20,7 @@ public class Instance {
    public NodeRuntime context;
 
    /** The engine used for all instance contexts. */
-   public static IJavetEnginePool<NodeRuntime> pool = new JavetEnginePool<>(
-      new JavetEngineConfig()
-         .setAllowEval(true)
-         .setGlobalName("globalThis")
-         .setJSRuntimeType(JSRuntimeType.Node)
-   );
+   public static IJavetEnginePool<NodeRuntime> pool;
 
    /** All registered unload hooks tied to this instance. */
    public final Queue hooks = new Queue();
@@ -71,7 +62,8 @@ public class Instance {
    public void destroy () throws JavetException {
       this.close();
       Grakkit.instances.remove(this);
-      engine.close();
+      this.engine.close();
+      this.engine.sendGCNotification();
    }
 
    /** Executes this instance by calling its entry point. */
