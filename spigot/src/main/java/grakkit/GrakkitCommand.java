@@ -36,6 +36,14 @@ public class GrakkitCommand extends Command {
       return true;
    }
 
+   public void setExecutor (V8ValueFunction executor) {
+      this.executor = executor;
+   }
+
+   public void setTabCompleter (V8ValueFunction tabCompleter) {
+      this.tabCompleter = tabCompleter;
+   }
+
    @Override
    public LinkedList<String> tabComplete (CommandSender sender, String alias, String[] args) {
       LinkedList<String> output = new LinkedList<>();

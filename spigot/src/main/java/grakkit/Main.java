@@ -42,8 +42,8 @@ public class Main extends JavaPlugin {
       Grakkit.close();
       GrakkitCommand.commandCache.values().forEach(subcache -> {
          subcache.values().forEach(command -> {
-            command.executor = null;
-            command.tabCompleter = null;
+            command.setExecutor(null);
+            command.setTabCompleter(null);
          });
       });
    }
@@ -92,8 +92,8 @@ public class Main extends JavaPlugin {
       }).computeIfAbsent(name, (key) -> {
          return new GrakkitCommand(namespace == null ? this.getName() : namespace, name, aliases == null ? new String[0] : aliases);
       });
-      command.executor = executor;
-      command.tabCompleter = tabCompleter;
+      command.setExecutor(executor);
+      command.setTabCompleter(tabCompleter);
       command.setPermission(permission);
    }
 }
