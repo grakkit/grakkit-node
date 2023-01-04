@@ -14,9 +14,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class Main extends JavaPlugin {
 
-   public static final HashMap<String, Wrapper> commands = new HashMap<>();
-   public static CommandMap registry;
-
    @Override
    public void onLoad() {
       DriverManager.getDrivers();
@@ -24,7 +21,7 @@ public class Main extends JavaPlugin {
       try {
          Field internal = this.getServer().getClass().getDeclaredField("commandMap");
          internal.setAccessible(true);
-         Main.registry = (CommandMap) internal.get(this.getServer());
+         GrakkitCommand.commandMap = (CommandMap) internal.get(this.getServer());
       } catch (Throwable error) {
          error.printStackTrace();
       }
@@ -43,30 +40,29 @@ public class Main extends JavaPlugin {
    @Override
    public void onDisable() {
       Grakkit.close();
-      Main.commands.values().forEach(command -> {
-         try {
-            command.executor = Grakkit.primary.runtime.createV8ValueFunction("() => {}");
-         } catch (Throwable error) {
-            // do nothing
-         }
-         try {
-            command.tabCompleter = Grakkit.primary.runtime.createV8ValueFunction("() => {}");
-         } catch (Throwable error) {
-            // do nothing
-         }
+      GrakkitCommand.commandCache.values().forEach(subcache -> {
+         subcache.values().forEach(command -> {
+            command.executor = null;
+            command.tabCompleter = null;
+         });
       });
    }
 
-   public void register (String namespace, String name, String[] aliases, String permission, String message, V8ValueFunction executor, V8ValueFunction tabCompleter) {
-      String key = namespace + ":" + name;
-      Wrapper command;
-      if (Main.commands.containsKey(key)) {
-         command = Main.commands.get(key);
-      } else {
-         command = new Wrapper(name, aliases);
-         Main.registry.register(namespace, command);
-         Main.commands.put(key, command);
-      }
-      command.options(permission, message, executor, tabCompleter);
+   public void registerCommand (
+      String namespace,
+      String name,
+      String[] aliases,
+      V8ValueFunction executor,
+      V8ValueFunction tabCompleter,
+      String permission
+   ) {
+      GrakkitCommand command = GrakkitCommand.commandCache.computeIfAbsent(namespace, (key) -> {
+         return new HashMap<>();
+      }).computeIfAbsent(name, (key) -> {
+         return new GrakkitCommand(namespace, name, aliases);
+      });
+      command.executor = executor;
+      command.tabCompleter = tabCompleter;
+      command.setPermission(permission);
    }
 }

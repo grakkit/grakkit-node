@@ -47,8 +47,8 @@ public class GrakkitAPI {
       return this.instance.runtime.execute(code, new byte[0], new V8ScriptOrigin(), false);
    }
 
-   public Instance fileInstance (String main) throws JavetException {
-      return this.fileInstance(main, UUID.randomUUID().toString());
+   public Instance fileInstance (String path) throws JavetException {
+      return this.fileInstance(path, UUID.randomUUID().toString());
    }
 
    public Instance fileInstance (String path, String meta) throws JavetException {
@@ -81,9 +81,9 @@ public class GrakkitAPI {
       return new Task(Task.TaskType.Interval, script, duration, args);
    }
 
-   public Class<?> load (File source, String name) throws ClassNotFoundException, MalformedURLException {
-      URL link = source.toURI().toURL();
-      String path = source.toPath().normalize().toString();
+   public Class<?> load (File file, String name) throws ClassNotFoundException, MalformedURLException {
+      URL link = file.toURI().toURL();
+      String path = file.toPath().normalize().toString();
       return Class.forName(name, true, Grakkit.loaders.computeIfAbsent(path, (key) -> new URLClassLoader(
          new URL[] { link },
          Grakkit.class.getClassLoader()
@@ -100,6 +100,13 @@ public class GrakkitAPI {
    
    public void on (String channel, V8ValueFunction listener) {
       Grakkit.channels.computeIfAbsent(channel, key -> new LinkedList<>()).add(listener);
+   }
+
+   public void reload () {
+      Grakkit.trigger(Hook.HookType.Reload);
+      Grakkit.channels.clear();
+      Grakkit.loaders.clear();
+      this.swap();
    }
 
    public Instance scriptInstance (String code) throws JavetException {
@@ -119,13 +126,6 @@ public class GrakkitAPI {
          }
       }, true);
       this.instance.close();
-   }
-
-   public void reload () {
-      Grakkit.trigger(Hook.HookType.Reload);
-      Grakkit.channels.clear();
-      Grakkit.loaders.clear();
-      this.swap();
    }
 
    public Task timeoutTask (V8ValueFunction script, int duration, String... args) {

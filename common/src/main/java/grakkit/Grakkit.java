@@ -116,6 +116,10 @@ public class Grakkit {
    }
 
    public static void trigger (Hook.HookType type) {
-      new LinkedList<>(Grakkit.hooks).forEach(hook -> hook.execute(type));
+      new LinkedList<>(Grakkit.hooks).forEach(hook -> {
+         if (hook.type == type) {
+            hook.execute();
+         }
+      });
    }
 }

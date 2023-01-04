@@ -4,30 +4,28 @@ public class Hook {
 
    public static enum HookType { CloseEnd, CloseStart, OpenEnd, OpenStart, Reload, Tick }
 
+   public Runnable callback;
    public Boolean once;
-   public Runnable runnable;
    public HookType type;
 
-   public Hook (HookType type, Runnable runnable, Boolean once) {
+   public Hook (HookType type, Runnable callback, Boolean once) {
       this.once = once;
-      this.runnable = runnable;
+      this.callback = callback;
       this.type = type;
       Grakkit.hooks.add(this);
    }
 
    public void destroy () {
-      if (this.runnable != null) {
+      if (this.callback != null) {
          Grakkit.hooks.remove(this);
-         this.runnable = null;
+         this.callback = null;
       }
    }
 
-   public void execute (HookType type) {
-      if (type == this.type) {
-         this.runnable.run();
-         if (this.once) {
-            this.destroy();
-         }
+   public void execute () {
+      this.callback.run();
+      if (this.once) {
+         this.destroy();
       }
    }
 }
