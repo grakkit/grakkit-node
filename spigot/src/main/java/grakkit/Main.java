@@ -48,18 +48,49 @@ public class Main extends JavaPlugin {
       });
    }
 
+   public void registerCommand (String name) {
+      this.registerCommand(name, null, null, null, null, null);
+   }
+
+   public void registerCommand (String name, V8ValueFunction executor) {
+      this.registerCommand(name, executor, null, null, null, null);
+   }
+
+   public void registerCommand (String name, V8ValueFunction executor, V8ValueFunction tabCompleter) {
+      this.registerCommand(name, executor, tabCompleter, null, null, null);
+   }
+
    public void registerCommand (
-      String namespace,
       String name,
-      String[] aliases,
       V8ValueFunction executor,
       V8ValueFunction tabCompleter,
       String permission
    ) {
+      this.registerCommand(name, executor, tabCompleter, permission, null, null);
+   }
+
+   public void registerCommand (
+      String name,
+      V8ValueFunction executor,
+      V8ValueFunction tabCompleter,
+      String permission,
+      String[] aliases
+   ) {
+      this.registerCommand(name, executor, tabCompleter, permission, aliases, null);
+   }
+
+   public void registerCommand (
+      String name,
+      V8ValueFunction executor,
+      V8ValueFunction tabCompleter,
+      String permission,
+      String[] aliases,
+      String namespace
+   ) {
       GrakkitCommand command = GrakkitCommand.commandCache.computeIfAbsent(namespace, (key) -> {
          return new HashMap<>();
       }).computeIfAbsent(name, (key) -> {
-         return new GrakkitCommand(namespace, name, aliases);
+         return new GrakkitCommand(namespace == null ? this.getName() : namespace, name, aliases == null ? new String[0] : aliases);
       });
       command.executor = executor;
       command.tabCompleter = tabCompleter;
