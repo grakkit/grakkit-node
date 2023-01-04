@@ -14,18 +14,13 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class Main extends JavaPlugin {
 
-   /** A list of all registered commands. */
    public static final HashMap<String, Wrapper> commands = new HashMap<>();
-
-   /** The internal command map used to register commands. */
    public static CommandMap registry;
 
    @Override
    public void onLoad() {
-      // Black magic. This fixes a bug, as something is breaking SQL Integration for other plugins. 
-      // See https://github.com/grakkit/grakkit/issues/14.
       DriverManager.getDrivers();
-      Grakkit.patch(new Loader(this.getClassLoader())); // CORE - patch class loader with GraalJS
+      Grakkit.patch(new Loader(this.getClassLoader()));
       try {
          Field internal = this.getServer().getClass().getDeclaredField("commandMap");
          internal.setAccessible(true);
@@ -38,31 +33,30 @@ public class Main extends JavaPlugin {
    @Override
    public void onEnable() {
       try {
-         this.getServer().getScheduler().runTaskTimer(this, Grakkit::tick, 0, 1); // CORE - run task loop
+         this.getServer().getScheduler().runTaskTimer(this, Grakkit::tick, 0, 1);
       } catch (Throwable error) {
          // none
       }
-      Grakkit.init(this.getDataFolder().getPath()); // CORE - initialize
+      Grakkit.open(this.getDataFolder().getPath());
    }
 
    @Override
    public void onDisable() {
-      Grakkit.close(); // CORE - close before exit
+      Grakkit.close();
       Main.commands.values().forEach(command -> {
          try {
-            command.executor = Grakkit.driver.context.createV8ValueFunction("() => {}");
+            command.executor = Grakkit.primary.runtime.createV8ValueFunction("() => {}");
          } catch (Throwable error) {
             // do nothing
          }
          try {
-            command.tabCompleter = Grakkit.driver.context.createV8ValueFunction("() => {}");
+            command.tabCompleter = Grakkit.primary.runtime.createV8ValueFunction("() => {}");
          } catch (Throwable error) {
             // do nothing
          }
       });
    }
 
-   /** Registers a custom command to the server with the given options. */
    public void register (String namespace, String name, String[] aliases, String permission, String message, V8ValueFunction executor, V8ValueFunction tabCompleter) {
       String key = namespace + ":" + name;
       Wrapper command;

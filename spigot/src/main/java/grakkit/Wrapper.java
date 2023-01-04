@@ -3,8 +3,8 @@ package grakkit;
 import com.caoccao.javet.values.reference.V8ValueArray;
 import com.caoccao.javet.values.reference.V8ValueFunction;
 
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -41,8 +41,8 @@ public class Wrapper extends Command {
    }
 
    @Override
-   public ArrayList<String> tabComplete (CommandSender sender, String alias, String[] args) {
-      ArrayList<String> output = new ArrayList<>();
+   public LinkedList<String> tabComplete (CommandSender sender, String alias, String[] args) {
+      LinkedList<String> output = new LinkedList<>();
       try {
          V8ValueArray input = this.tabCompleter.invoke("", sender, alias, args);
          for (long index = 0; index < input.getLength(); index++) output.add(input.get(index).toString());

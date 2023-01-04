@@ -2,103 +2,49 @@ package grakkit;
 
 import com.caoccao.javet.enums.JSRuntimeType;
 
+import com.caoccao.javet.interop.NodeRuntime;
 import com.caoccao.javet.interop.V8Host;
 
+import com.caoccao.javet.interop.engine.IJavetEnginePool;
 import com.caoccao.javet.interop.engine.JavetEngineConfig;
 import com.caoccao.javet.interop.engine.JavetEnginePool;
 
 import com.caoccao.javet.values.reference.V8ValueFunction;
 
-import com.eclipsesource.json.Json;
-import com.eclipsesource.json.JsonObject;
-
 import java.net.URL;
 import java.net.URLClassLoader;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 
 public class Grakkit {
-
-   /** All registered cross-context channels. */
+   
    public static final HashMap<String, LinkedList<V8ValueFunction>> channels = new HashMap<>();
-
-   /** The instance running on the main thread. */
-   public static FileInstance driver;
-
-   /** All instances created with the instance management system. */
-   public static final LinkedList<Instance> instances = new LinkedList<>();
-
-   /** All registered class loaders. */
+   public static final LinkedList<Hook> hooks = new LinkedList<>();
    public static final HashMap<String, URLClassLoader> loaders = new HashMap<>();
+   public static IJavetEnginePool<NodeRuntime> pool;
+   public static Instance primary;
+   public static LinkedList<Task> tasks = new LinkedList<>();
 
-   /** Closes all open instances. */
    public static void close () {
-      Grakkit.driver.close();
-      try {
-         Grakkit.driver.engine.close();
-      } catch (Throwable error) {
-         // do nothing
-      }
-      new ArrayList<>(Grakkit.instances).forEach(value -> {
-         try {
-            value.destroy();
-         } catch (Throwable error) {
-            // do nothing...?
-         }
-      });
-      V8Host runtime = V8Host.getInstance(JSRuntimeType.Node);
-      runtime.setLibraryReloadable(true);
-      try {
-         Instance.pool.close();
-         Instance.pool = null;
-         runtime.close();
-      } catch (Throwable error) {
-         // do nothing
-      }
-      runtime.unloadLibrary();
-   }
-
-   /** Initializes the Grakkit Environment. */
-   public static void init (String root) {
-      Paths.get(root).toFile().mkdir();
-      Path info = Paths.get(root, "package.json");
-      String main = "index.js";
-      if (info.toFile().exists()) {
-         try {
-            StringBuilder content = new StringBuilder();
-            Files.lines(info).forEach(line -> content.append(line).append("\n"));
-            JsonObject object = Json.parse(content.toString()).asObject();
-            try {
-               main = object.getString("main", main);
-            } catch (Throwable error) {
-               // do nothing
-            }
-         } catch (Throwable error) {
-            error.printStackTrace();
-         }
-      }
+      Grakkit.trigger(Hook.HookType.CloseStart);
       V8Host.setLibraryReloadable(true);
-      Instance.pool = new JavetEnginePool<>(
-         new JavetEngineConfig()
-            .setAllowEval(true)
-            .setGlobalName("globalThis")
-            .setJSRuntimeType(JSRuntimeType.Node)
-      );
+      Grakkit.primary.destroy();
+      Grakkit.primary = null;
       try {
-         Grakkit.driver = new FileInstance(root, main, "grakkit");
-         Grakkit.driver.open();
+         Grakkit.pool.close();
+         Grakkit.pool = null;
+         V8Host host = V8Host.getInstance(JSRuntimeType.Node);
+         host.close();
+         host.unloadLibrary();
       } catch (Throwable error) {
          error.printStackTrace();
       }
+      Grakkit.trigger(Hook.HookType.CloseEnd);
    }
 
-   /** Locates the given class's true source location. */
    public static URL locate (Class<?> clazz) {
       try {
          URL resource = clazz.getProtectionDomain().getCodeSource().getLocation();
@@ -123,19 +69,53 @@ public class Grakkit {
       return null;
    }
 
-   /** Executes the task loop for all instances. */
-   public static void tick () {
-      Grakkit.driver.tick();
-      Grakkit.instances.forEach(value -> value.tick());
+   public static void open (String root) {
+      Grakkit.trigger(Hook.HookType.OpenStart);
+      V8Host.setLibraryReloadable(true);
+      Grakkit.pool = new JavetEnginePool<>(
+         new JavetEngineConfig()
+            .setAllowEval(true)
+            .setGlobalName("globalThis")
+            .setJSRuntimeType(JSRuntimeType.Node)
+      );
+      Paths.get(root).toFile().mkdir();
+      String source = "index.js";
+      Config[] configs = {
+         new Config(Config.ConfigType.JSON, root, ".grakkitrc", false),
+         new Config(Config.ConfigType.YAML, root, "config.yml", false),
+         new Config(Config.ConfigType.JSON, root, "grakkit.json", false),
+         new Config(Config.ConfigType.JSON, root, "package.json", true)
+      };
+      for (Config config : configs) {
+         String main = config.getMain();
+         if (main != null) {
+            source = main;
+            break;
+         }
+      }
+      try {
+         Grakkit.primary = new Instance(Instance.InstanceType.File, root, source, "grakkit", null);
+         Grakkit.primary.open();
+      } catch (Throwable error) {
+         error.printStackTrace();
+      }
+      Grakkit.trigger(Hook.HookType.OpenEnd);
    }
 
-   /** Updates the current ClassLoader to one which supports the GraalJS engine. */
    public static void patch (Loader loader) {
       try {
          loader.addURL(Grakkit.locate(Grakkit.class));
          Thread.currentThread().setContextClassLoader((ClassLoader) loader);
       } catch (Throwable error) {
-         throw new RuntimeException("Failed to load classes!", error);
+         error.printStackTrace();
       }
+   }
+
+   public static void tick () {
+      new LinkedList<>(Grakkit.tasks).forEach(task -> task.tick());
+   }
+
+   public static void trigger (Hook.HookType type) {
+      new LinkedList<>(Grakkit.hooks).forEach(hook -> hook.execute(type));
    }
 }

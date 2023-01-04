@@ -2,9 +2,13 @@ package grakkit;
 
 import com.caoccao.javet.exceptions.JavetException;
 
-import com.caoccao.javet.interop.callback.JavetCallbackContext;
+import com.caoccao.javet.interop.V8ScriptOrigin;
+
+import com.caoccao.javet.values.V8Value;
 
 import com.caoccao.javet.values.reference.V8ValueFunction;
+
+import grakkit.Hook.HookType;
 
 import java.io.File;
 
@@ -12,62 +16,71 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.UUID;
 
 public class GrakkitAPI {
+   
+   private final Instance instance;
 
-   /** The underlying instance to which this API is linked. */
-   private Instance instance;
-
-   /** Builds a new Grakkit API object around the given instance. */
    public GrakkitAPI (Instance instance) {
       this.instance = instance;
    }
 
-   /** Destroys the current instance. */
-   public void destroy () throws Exception {
-      if (this.instance == Grakkit.driver) {
-         throw new Exception("The primary instance cannot be destroyed!");
-      } else {
-         this.instance.destroy();
+   public void destroy () throws JavetException {
+      this.instance.destroy();
+   }
+
+   public void emit (String channel, String... data) {
+      if (Grakkit.channels.containsKey(channel)) {
+         new LinkedList<>(Grakkit.channels.get(channel)).forEach(listener -> {
+            try {
+               listener.invokeVoid("", (Object[]) data);
+            } catch (Throwable error) {
+               error.printStackTrace();
+            }
+         });
       }
    }
 
-   /** Sends a message into the global event framework. Listeners will fire on next tick. */
-   public void emit (String channel, String message) {
-      this.instance.messages.add(new Message(channel, message));
+   public V8Value eval (String code) throws JavetException {
+      return this.instance.runtime.execute(code, new byte[0], new V8ScriptOrigin(), false);
    }
 
-   /** Creates a new file instance with the given index path. */
-   public FileInstance fileInstance (String main) throws JavetException {
+   public Instance fileInstance (String main) throws JavetException {
       return this.fileInstance(main, UUID.randomUUID().toString());
    }
 
-   /** Creates a new file instance with the given index path and metadata tag. */
-   public FileInstance fileInstance (String main, String meta) throws JavetException {
-      FileInstance instance = new FileInstance(this.instance.root, main, meta);
-      Grakkit.instances.add(instance);
-      return instance;
+   public Instance fileInstance (String path, String meta) throws JavetException {
+      return new Instance(Instance.InstanceType.File, this.instance.root, path, meta, this.instance);
    }
 
-   /** Gets the "meta" value of the current instance. */
    public String getMeta () {
       return this.instance.meta;
    }
 
-   /** Returns the "root" of the current instance. */
    public String getRoot () {
       return this.instance.root;
    }
 
-   /** Adds an unload hook to be executed just before the instance is closed. */
-   public void hook (V8ValueFunction script) {
-      this.instance.hooks.list.add(script);
+   public Hook hook (String name, V8ValueFunction script) {
+      return this.hook(name, script, false);
    }
 
-   /** Loads the given class from the given source, usually a JAR library. */
+   public Hook hook (String name, V8ValueFunction script, Boolean once) {
+      return new Hook(HookType.valueOf(name), () -> {
+         try {
+            script.invokeVoid("");
+         } catch (Throwable error) {
+            error.printStackTrace();
+         }
+      }, once);
+   }
+
+   public Task intervalTask (V8ValueFunction script, int duration, String... args) {
+      return new Task(Task.TaskType.Interval, script, duration, args);
+   }
+
    public Class<?> load (File source, String name) throws ClassNotFoundException, MalformedURLException {
       URL link = source.toURI().toURL();
       String path = source.toPath().normalize().toString();
@@ -77,7 +90,6 @@ public class GrakkitAPI {
       )));
    }
 
-   /** Unregisters an event listener from the channel registry. */
    public boolean off (String channel, V8ValueFunction listener) {
       if (Grakkit.channels.containsKey(channel)) {
          return Grakkit.channels.get(channel).remove(listener); 
@@ -86,53 +98,37 @@ public class GrakkitAPI {
       }
    }
    
-   /** Registers an event listener to the channel registry. */
    public void on (String channel, V8ValueFunction listener) {
       Grakkit.channels.computeIfAbsent(channel, key -> new LinkedList<>()).add(listener);
    }
 
-   /** Pushes a script into the tick loop to be fired upon next tick. */
-   public void push (V8ValueFunction script) {
-      this.instance.tasks.list.add(script);
-   }
-
-   /** Creates a new script instance with the given source code. */
-   public ScriptInstance scriptInstance (String code) throws JavetException {
+   public Instance scriptInstance (String code) throws JavetException {
       return this.scriptInstance(code, UUID.randomUUID().toString());
    }
 
-   /** Creates a new script instance with the given source code and metadata tag. */
-   public ScriptInstance scriptInstance (String code, String meta) throws JavetException {
-      ScriptInstance instance = new ScriptInstance(this.instance.root, code, meta);
-      Grakkit.instances.add(instance);
-      return instance;
+   public Instance scriptInstance (String code, String meta) throws JavetException {
+      return new Instance(Instance.InstanceType.Script, this.instance.root, code, meta, this.instance);
    }
 
-   /** Closes and re-opens the current instance. Works best when pushed into the tick loop. */
    public void swap () {
-      try {
-         this.hook(this.instance.context.createV8ValueFunction(new JavetCallbackContext(this.instance, this.instance.getClass().getMethod("open"))));
-      } catch (Throwable error) {
-         // do nothing
-      }
+      new Hook(Hook.HookType.Tick, () -> {
+         try {
+            this.instance.open();
+         } catch (Throwable error) {
+            error.printStackTrace();
+         }
+      }, true);
       this.instance.close();
    }
 
-   /** Closes all open instances, resets everything, and swaps the main instance. */
-   public void reload () throws Exception {
-      if (this.instance == Grakkit.driver) {
-         new ArrayList<>(Grakkit.instances).forEach(value -> {
-            try {
-               value.destroy();
-            } catch (Throwable error) {
-               // do nothing
-            }
-         });
-         Grakkit.channels.clear();
-         Grakkit.loaders.clear();
-         this.swap();
-      } else {
-         throw new Exception("This method may only be called from the main context!");
-      }
+   public void reload () {
+      Grakkit.trigger(Hook.HookType.Reload);
+      Grakkit.channels.clear();
+      Grakkit.loaders.clear();
+      this.swap();
+   }
+
+   public Task timeoutTask (V8ValueFunction script, int duration, String... args) {
+      return new Task(Task.TaskType.Timeout, script, duration, args);
    }
 }

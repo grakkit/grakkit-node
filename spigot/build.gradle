@@ -1,28 +1,25 @@
 plugins {
-   id 'java'
+   id 'java-library'
    id 'com.github.johnrengelman.shadow' version '7.1.2'
 }
 
 dependencies {
-   // common lib deps
    implementation project(':common')
-   implementation "com.eclipsesource.minimal-json:minimal-json:0.9.1"
 
-   // javet deps
-   implementation "com.caoccao.javet:javet:${javetVersion}"
+   implementation 'com.eclipsesource.minimal-json:minimal-json:0.9.5'
+   implementation 'me.carleslc.Simple-YAML:Simple-Yaml:1.8'
+   implementation "com.caoccao.javet:javet:2.0.3"
 
-   // platform-specific deps
    compileOnly "org.spigotmc:spigot-api:1.8-R0.1-SNAPSHOT"
 }
 
 jar {
    archiveBaseName.set('grakkit')
-   archiveClassifier.set('paper')
+   archiveClassifier.set('spigot')
    archiveVersion.set(project.property('version'))
 }
 
 processResources {
-   // populate version
    filesMatching('**/plugin.yml') {
       expand project.properties
    }
@@ -30,7 +27,14 @@ processResources {
 
 repositories {
    mavenCentral()
+   maven { url = 'https://jitpack.io' }
    maven { url = 'https://oss.sonatype.org/content/repositories/central' }
    maven { url = 'https://oss.sonatype.org/content/repositories/snapshots' }
    maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+}
+
+java {
+   toolchain {
+      languageVersion.set(JavaLanguageVersion.of(17))
+   }
 }
